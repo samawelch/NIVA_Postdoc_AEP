@@ -68,12 +68,8 @@ theme_set(new = theme_few())
 Next, maps of Europe from the `giscoR` package are loaded and cropped to the relevant area, and the provided site data is converted to an `sf` object for compatibility with `sf`'s GIS functions.
 
 ```{r gis_setup, warning=FALSE}
-# Get a map of Europe and crop it to Norway
-gisco_Europe <- gisco_get_countries(epsg = 4326, region = "Europe") |> 
-      st_crop(xmin = 5, xmax = 13, ymin = 57, ymax = 61) 
-
-gisco_Europe_zoom <- gisco_get_countries(epsg = 4326, region = "Europe") |> 
-      st_crop(xmin = 5, xmax = 12, ymin = 50, ymax = 70) 
+# Get a map of Europe
+gisco_Europe <- gisco_get_countries(epsg = 4326, region = "Europe") 
 
 sites_sf <- st_as_sf(sites, coords = c("LONGITUDE", "LATITUDE"), crs = 4326) |> 
   select(-COORDINATE_SYSTEM, -SITE_CODE)
@@ -81,9 +77,9 @@ sites_sf <- st_as_sf(sites, coords = c("LONGITUDE", "LATITUDE"), crs = 4326) |>
 
 ## Task A: Import and Visualise Spatiotemporal Exposure Data
 
-Measured concentrations for 40 stressors across 5 sites were imported. Concentrations of 2-methyl-4-chlorophenoxyacetic acid (MCPA), a phenoyx herbicide, were measured over a 5-month period in 2019, 1-8 times, site depending. Data were plotted as a scatter plot/line graph to show spatial (site) and temporal (sampling date) variation.
+Measured concentrations for 40 stressors across 5 sites were imported. Concentrations of 2-methyl-4-chlorophenoxyacetic acid (MCPA), a phenoyx herbicide, were measured over a 5-month period in 2019, 1-8 times, site depending. Data were plotted as a scatter plot/line graph to show spatial (site) and temporal (sampling date) variation. 
 
-```{r task_a, warning=FALSE}
+```{r task_a, fig.width = 10, warning=FALSE, message=FALSE}
 
 # Sampling Map
 plot_a0 <- ggplot(gisco_Europe) +
@@ -93,36 +89,12 @@ plot_a0 <- ggplot(gisco_Europe) +
       geom_sf(data = sites_sf, aes(size = 6, colour = SITE_NAME)) +
   geom_sf_text(data = sites_sf, aes(label = c("T", "V", "H", "S", "M"))) +
   theme(legend.position = "none", axis.title = element_blank(), axis.ticks = element_blank(), axis.text = element_blank()) +
-      scale_color_few()
+      scale_color_few() +
+  coord_sf(xlim = c(5, 13), ylim = c(57, 61))
 
-# Spatial Variation
-
-plot_a1 <- mcpa_exposure %>% 
-  ggplot(mapping = aes(x = SITE_NAME, y = MEASURED_VALUE, colour = SITE_NAME)) +
-  geom_boxplot() +
-    scale_y_log10() +
-  scale_color_few() +
-  labs(x = "Sampling Site",
-       y = "Measured Concentration (μg/L)",
-       colour = "Sampling Site",
-       shape = "Sampling Site")
-
-# Temporal Variation
-
-plot_a2 <- mcpa_exposure %>% 
-  ggplot(mapping = aes(x = SAMPLE_DATE, y = MEASURED_VALUE, group = floor_date(SAMPLE_DATE, unit = "months"))) +
-  geom_boxplot() +
-    scale_y_log10() +
-  labs(x = "Sampling Date",
-       y = "Measured Concentration (μg/L)",
-       colour = "Sampling Site",
-       shape = "Sampling Site")
-
-# Spatio-Temporal Variation
-
-plot_a3 <- mcpa_exposure %>%
+plot_a1 <- mcpa_exposure %>%
   ggplot(mapping = aes(x = SAMPLE_DATE, y = MEASURED_VALUE, colour = SITE_NAME)) +
-  geom_line(size = 2) +
+  geom_line(size = 1.2) +
   geom_point(size = 7) +
   geom_text(aes(label = SITE_NAME |> substr(start = 1, stop = 1)), colour = "black") +
   scale_y_log10() +
@@ -136,23 +108,17 @@ plot_a3 <- mcpa_exposure %>%
   theme(legend.position = "none") +
    annotation_logticks(sides = "l")
 
-# task_a_plot <- plot_grid(plot_a3, plot_a0,
-#           ncol = 2, rel_widths = c(3, 1))
-```
-
-```{r task_a_plot, fig.width = 10, warning=FALSE, message=FALSE}
-task_a_plot <- ggdraw(plot = plot_a3) +
+task_a_plot <- ggdraw(plot = plot_a1) +
   draw_plot(plot_a0, x = 0.77, y = 0.6, width = 0.2, height = 0.3, scale = 1.5)
 task_a_plot
+
 ```
+
+Figure 1: Line graph/scatter plot of measured concentrations of 2-methyl-4-chlorophenoxyacetic acid (MCPA) in 5 freshwater sampling sites in Norway, between May 5th and October 14th, 2019. Each point represents a single sample. Inset map shows locations of sampling sites (T)imebekken, (V)asshaglona, (H)eiabekken, (S)kuterudbekken, and (M)ørdrebekken.
 
 ## Task B: Predict tissue concentrations of chemicals in fish
 
-Any outliers?
-
-How to calculate some of these :(?
-
-Also how to make nice tables in quarto?
+Summary statistics (mean, standard deviation, maximum, minimum, and 5th/95th percentiles) were calculated for each combination of site and stressor across the sampling period.
 
 ```{r task_b, warning=FALSE, message=FALSE}
 all_data_summary <- 
@@ -181,21 +147,28 @@ all_data %>%
 
 # Make a table using knitr
 task_b_table <- knitr::kable(all_data_summary, digits = 2,
-             col.names = c("Site", "Stressor", "n", "Mean ± SD", "Min.", "Max.", "5th Percentile", "95th Percentile"),
-              caption = "Table of mean, standard deviation, maximum, minimum and percentile values of measured concentrations of 48 chemical stressors across 6 freshwater sampling sites in Norway, May 6th to October 28th 2019. *: <i>n</i> too small to calculate standard deviation. All values in μg/L, rounded to 2 d.p.")
-
+             col.names = c("Site", "Stressor", "n", "Mean ± SD", "Min.", "Max.", "5th Percentile", "95th Percentile"))
 
 ```
 
 ```{=html}
 <details>
-<summary>Show Table 1: Summary Statistics of Stressor Concentrations</summary>
+<summary>Show Table 1: Summary statistics of measured stressor concentrations in water</summary>
 ```
 ```{r task_b_table, echo=FALSE}
 task_b_table
 ```
 
 </details>
+
+Table 1: Table of mean, standard deviation, maximum, minimum and percentile values of measured concentrations of 48 chemical stressors across 6 freshwater sampling sites in Norway, May 6th to October 28th 2019. *: <i>n</i> too small to calculate standard deviation. All values in μg/L, rounded to 2 d.p.
+
+
+Tissue concentrations of stressors in fish were calculated as follows. First, the R package `webchem` was used to assign PubChem IDs to the stressors based on InChIKeys. These IDs were subsequently used to look up LogKOW (a.k.a XLogP) values on PubChem, which were available as predicted values for 39 substances, but not for spinosad. These values were then used to predict tissue concentrations following the equation:
+
+$$C_f = C_w \times 10^{0.76 \times logP - 0.23}$$
+
+Tissue concentration data is subsequently saved to `/data/Cf_summary_table.csv` and displayed below.
 
 ```{r concentration_fish, warning=FALSE, message=FALSE}
 # Try and import the (already downloaded and saved) chem properties, try importing if it doesn't work
@@ -232,14 +205,14 @@ Cf_summary <- Cf_all_stressors |>
 
 # Make a pretty table using knitr
 Cf_summary_table <- knitr::kable(Cf_summary, digits = 2,
-             col.names = c("Stressor", "Heiabekken", "Mørdrebekken", "Skuterudbekken", "Timebekken", "Vasshaglona"),
-              caption = "Table of mean and standard deviation of measured concentrations of 48 chemical stressors across 6 freshwater sampling sites in Norway, May 6th to October 28th 2019. *: n too small to calculate standard deviation. All values in μg/L.")
+             col.names = c("Stressor", "Heiabekken", "Mørdrebekken", "Skuterudbekken", "Timebekken", "Vasshaglona"))
 
+write_csv(x = Cf_summary, file = "data/Cf_summary_table.csv")
 ```
 
 ```{=html}
 <details>
-<summary>Show Table 2: Cf_summary_table</summary>
+<summary>Show Table 1: Summary statistics of predicted stressor concentrations in fish tissue</summary>
 ```
 ```{r Cf_summary_table, echo=FALSE}
 Cf_summary_table
@@ -247,74 +220,62 @@ Cf_summary_table
 
 </details>
 
+Table 2: Table of mean and standard deviation of predicted concentrations in fish tissues of 39 chemical stressors across 6 freshwater sampling sites in Norway, May 6th to October 28th 2019. *: n too small to calculate standard deviation. All values in μg/kg, calculated from measured water concentrations and predicted LogKOW, following the equation $C_f = C_w \times 10^{0.76 \times logP - 0.23}$.
+
 ## Task C: Visualize the values of Cw and Cf on a map
 
+A purely map-based approach to this task was considered. However, given the number of stressors assessed, and the inability (with available data) of determining which concentrations were most environmentally relevant, it was decided that box plots with an accompanying map of sampling sites was a more appropriate approach.
 
+```{r task_c, warning=FALSE, message=FALSE, fig.width = 10, fig.height=12}
+#| fig-cap: 
+#|   - "Speed and Stopping Distances of Cars"
 
-```{r task_c, warning=FALSE, message=FALSE, fig.width = 10, fig.height=15}
 task_c_data <- Cf_all_stressors |>
   left_join(sites_sf, by = "SITE_NAME") |>
   left_join(all_stressors, by = "STRESSOR_NAME") |>
   pivot_longer(cols = c(MEASURED_VALUE, FISH_CONC_uGKG), names_to = "Media", values_to = "Stressor_ug") |>
   mutate(Media = case_when(
-    Media == "MEASURED_VALUE" ~ "Water",
-    TRUE ~ "Fish"
-  ) |> factor(levels = c("Water", "Fish"))
+    Media == "MEASURED_VALUE" ~ "Water (μg/L)",
+    TRUE ~ "Fish (μg/kg)"
+  ) |> factor(levels = c("Water (μg/L)", "Fish (μg/kg)"))
   )
 
 task_c_map <-
-  ggplot(gisco_Europe_zoom) +
+  ggplot(data = gisco_Europe) +
   geom_sf() +
   geom_sf(data = sites_sf) +
   geom_sf_text(aes(label = NAME_ENGL), colour = "darkgrey") +
-  geom_sf(data = sites_sf, aes(size = 5, colour = SITE_NAME)) +
+  geom_sf(data = sites_sf, aes(size = 7, colour = SITE_NAME)) +
   geom_sf_text(data = sites_sf, aes(label = c("T", "V", "H", "S", "M"))) +
-  theme(legend.position = "none", axis.title = element_blank(), axis.ticks = element_blank(), axis.text = element_blank(), plot.margin = unit(c(0,0,0,0), "cm")) +
+  theme(legend.position = "none", axis.title = element_blank(), axis.ticks = element_blank(), axis.text = element_blank()) +
+  coord_sf(xlim = c(5, 12), ylim = c(58, 64)) +
       scale_color_few()
 
-task_c_plot_list <- vector("list", 10)
-n <- 0
+task_c_worldmap <- ggplot(data = gisco_countries) +
+  geom_sf() +
+  geom_rect(aes(xmin = 5, xmax = 12, ymin = 58, ymax = 64), color = "red", fill = NA) +
+    coord_sf(expand = FALSE) +
+    theme(axis.text = element_blank(), axis.ticks = element_blank())
 
-
-for (site in sites$SITE_NAME) {
-  for (medium in c("Water", "Fish")) {
-    n <- n + 1
-    temp_data <- task_c_data |> filter(Media == medium)
-    temp_plot <- temp_data |>
-      filter(SITE_NAME == site) |>
-      ggplot(aes(x = Stressor_ug, y = STRESSOR_ACRONYM)) +
-      geom_boxplot() +
-      scale_x_log10() +
-      labs(
-        x = "Measured Concentration (μg/L)",
-        y = "Stressor (Abbreviated)",
-        title = paste0(site, " (", medium, ")")
-      ) +
-      annotation_logticks(sides = "b") +
-      theme(axis.title = element_blank())
-    task_c_plot_list[[n]] <- temp_plot
-  }
-}
-
-#try facets instead
 task_c_boxplots <- ggplot(data = task_c_data, mapping = aes(x = Stressor_ug, y = STRESSOR_ACRONYM, fill = SITE_NAME)) +
       geom_boxplot() +
       scale_x_log10() +
   scale_fill_few() +
       labs(
-        x = "Measured Concentration (μg/L)",
+        x = "Measured Concentration",
         y = "Stressor (Abbreviated)") +
       annotation_logticks(sides = "b") +
-      theme(axis.title = element_blank(),
-            legend.position = "none") +
-  facet_grid(SITE_NAME ~ Media, scales = "free", space = "free", drop = TRUE)
+      theme(legend.position = "none") +
+  facet_grid(SITE_NAME ~ Media, scales = "free", space = "free", drop = TRUE, switch = "y") +
+  theme(plot.margin = unit(c(0, 5, 0, 0), "cm"))
 
-# y.grob <- textGrob("Stressor", 
-#                    gp=gpar(fontface="bold", fontsize=15), rot=90)
-# 
-# x.grob <- textGrob("Concentration (μg/L)", 
-#                    gp=gpar(fontface="bold", fontsize=15))
+task_c_plot <- ggdraw(plot = task_c_boxplots) +
+  draw_plot(task_c_map, x = 0.82, y = 0.715, width = 0.17, height = 0.3, scale = 1) +
+    draw_plot(task_c_worldmap, x = 0.82, y = 0.55, width = 0.17, height = 0.3, scale = 1)
 
-plot_grid(task_c_boxplots, task_c_map, ncol = 2, nrow = 1, rel_width = c(10000, 1))
+task_c_plot
 
 ```
+
+Figure 2: Box plot of concentrations, in water (measured, μg/L) and fish tissue (predicted from water and LogKow, μg/kg), for 40 chemical stressors sampled April - October 2019 across 5 freshwater sites in southern Norway. Inset map shows locations of (T)imebekken, (V)asshaglona, (H)eiabekken, (S)kuterudbekken, and (M)ørdrebekken, as well as rough area of the world. Acronyms: p,p'-DDE: 1,1'-(2,2-Dichloro-1,1-ethenediyl)bis(4-chlorobenzene), BAM: 2,6-dichlorobenzamide (BAM), MCPA: 2-methyl-4-chlorophenoxyacetic acid (MCPA), ACNF: aclonifen, AXSB: azoxystrobin, BTZN: bentazone, BXFN: bixafen, BSCL: boscalid, CBDZ: carbendazim, CFVP: chlorfenvinphos, CLMZ: clomazone, CPRL: clopyralid, CZFM: cyazofamid, CPDN: cyprodinil, DCHP: dichlorprop, DFNC: diflufenican, FNMD: fenamidone, FPPM: fenpropimorph, FLSL: florasulam, FDXN: fludioxonil, FLXP: fluroxypyr, IMDC: imidacloprid, MDPM: mandipropamid, MCPP: mecoprop, MTLX: metalaxyl, MTMT: metamitron, METZ: metribuzin, PCCR: pencycuron, PNXD: pinoxaden, PPMC: propamocarb, PCAZ: propiconazole, PPCZ: propoxycarbazone, PCZ-D: prothioconazole-desthio, PCSB: pyraclostrobin, PRDF: pyridafol, PRSL: pyroxsulam, SPNS: spinosad, TBDZ: thiabendazole, THCP: thiacloprid, TOSB: trifloxystrobin.
+
