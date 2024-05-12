@@ -1,9 +1,9 @@
 ---
-title: "NIVA_Postdoc_AEP"
+title: "README.md"
 author: Sam A. Welch
 date: 2024.05.09
 format: 
-  html: 
+  gfm: 
     toc: true
     code-fold: true
     code-summary: "Show code"
@@ -11,23 +11,28 @@ editor_options:
   chunk_output_type: inline
 ---
 
+This README.md file is a rendering of the .qmd document of the same name, written as part of the coding task for a postdoctoral position at NIVA. All code is my own work. The (indirect) assistance of the authors of the below packages in completing this project is gratefully acknowledged. This project was created using R version 4.4.0, and may not run properly under other versions.
+
 ## Setup
 
 ```{r packages, warning=FALSE, message=FALSE}
 library(tidyverse)  # tidyverse packages for data cleaning, graphs, etc. 
 library(webchem)    # access to chemical database APIs
 library(readxl)     # read Excel files
-library(sf)         # handle geographical data sets
-library(maps)       # default maps of the world
-library(csmaps)     # maps of Norway
-library(giscoR) # more maps
-library(cowplot) # plots in grids
-library(ggthemes) # colour palettes
+library(sf)         # GIS functions
+library(giscoR)     # Eurostat maps
+library(cowplot)    # plots in grids
+library(ggthemes)   # colour palettes
 
 options(knitr.kable.NA = '-')
+knitr::opts_chunk$set(dev = "ragg_png")
 ```
 
 ### Data
+
+Data provided as part of the assignment is loaded and processed below. In addition, a .csv of abbreviated stressor names (author's own work, and not based on any standardised practice) created for this assignment is loaded in.
+
+Code chunks and tables have been placed in collapsible elements to improve document readability. Click the "▶ Show code" (or similar) button to show the section.
 
 ```{r data, echo=FALSE, warning=FALSE}
 exposure <- read_excel(path = "data/Exposure_data_AEP.xlsx", sheet = 2)
@@ -60,13 +65,15 @@ if (length(all_data$MEASURED_UNIT %>% unique()) != 1) {
 theme_set(new = theme_few())
 ```
 
+Next, maps of Europe from the `giscoR` package are loaded and cropped to the relevant area, and the provided site data is converted to an `sf` object for compatibility with `sf`'s GIS functions.
+
 ```{r gis_setup, warning=FALSE}
 # Get a map of Europe and crop it to Norway
 gisco_Europe <- gisco_get_countries(epsg = 4326, region = "Europe") |> 
       st_crop(xmin = 5, xmax = 13, ymin = 57, ymax = 61) 
 
 gisco_Europe_zoom <- gisco_get_countries(epsg = 4326, region = "Europe") |> 
-      st_crop(xmin = 5, xmax = 13, ymin = 48, ymax = 72) 
+      st_crop(xmin = 5, xmax = 12, ymin = 50, ymax = 70) 
 
 sites_sf <- st_as_sf(sites, coords = c("LONGITUDE", "LATITUDE"), crs = 4326) |> 
   select(-COORDINATE_SYSTEM, -SITE_CODE)
@@ -74,21 +81,16 @@ sites_sf <- st_as_sf(sites, coords = c("LONGITUDE", "LATITUDE"), crs = 4326) |>
 
 ## Task A: Import and Visualise Spatiotemporal Exposure Data
 
-We can find some better plots for this later.
-
-Todo: Pick a unique icon and colour for each site, use throughout
+Measured concentrations for 40 stressors across 5 sites were imported. Concentrations of 2-methyl-4-chlorophenoxyacetic acid (MCPA), a phenoyx herbicide, were measured over a 5-month period in 2019, 1-8 times, site depending. Data were plotted as a scatter plot/line graph to show spatial (site) and temporal (sampling date) variation.
 
 ```{r task_a, warning=FALSE}
-#| label: fig1_MCPA_spatiotemporal
-#| fig-cap: "Spatial and Temporal Variation in MCPA Concentrations"
-#| warning: false
 
 # Sampling Map
 plot_a0 <- ggplot(gisco_Europe) +
   geom_sf() +
   geom_sf(data = sites_sf) +
   geom_sf_text(aes(label = NAME_ENGL), colour = "darkgrey") +
-      geom_sf(data = sites_sf, aes(size = 5, colour = SITE_NAME)) +
+      geom_sf(data = sites_sf, aes(size = 6, colour = SITE_NAME)) +
   geom_sf_text(data = sites_sf, aes(label = c("T", "V", "H", "S", "M"))) +
   theme(legend.position = "none", axis.title = element_blank(), axis.ticks = element_blank(), axis.text = element_blank()) +
       scale_color_few()
@@ -120,14 +122,14 @@ plot_a2 <- mcpa_exposure %>%
 
 plot_a3 <- mcpa_exposure %>%
   ggplot(mapping = aes(x = SAMPLE_DATE, y = MEASURED_VALUE, colour = SITE_NAME)) +
-  geom_line() +
-  geom_point(size = 5) +
+  geom_line(size = 2) +
+  geom_point(size = 7) +
   geom_text(aes(label = SITE_NAME |> substr(start = 1, stop = 1)), colour = "black") +
   scale_y_log10() +
   scale_color_few() +
   labs(
     x = "Sampling Date (2019)",
-    y = "Measured Concentration (μg/L)",
+    y = "MCPA Concentration (μg/L)",
     colour = "Sampling Site",
     shape = "Sampling Site"
   ) +
@@ -136,9 +138,11 @@ plot_a3 <- mcpa_exposure %>%
 
 # task_a_plot <- plot_grid(plot_a3, plot_a0,
 #           ncol = 2, rel_widths = c(3, 1))
+```
 
+```{r task_a_plot, fig.width = 10, warning=FALSE, message=FALSE}
 task_a_plot <- ggdraw(plot = plot_a3) +
-  draw_plot(plot_a0, x = 0.8, y = 0.65, width = 0.2, height = 0.3, scale = 1.5)
+  draw_plot(plot_a0, x = 0.77, y = 0.6, width = 0.2, height = 0.3, scale = 1.5)
 task_a_plot
 ```
 
@@ -150,11 +154,12 @@ How to calculate some of these :(?
 
 Also how to make nice tables in quarto?
 
-```{r task_b, warning=FALSE}
+```{r task_b, warning=FALSE, message=FALSE}
 all_data_summary <- 
 all_data %>% 
   group_by(SITE_NAME, STRESSOR_NAME) %>% 
-  summarise(Mean_MEASURED_VALUE = mean(MEASURED_VALUE),
+  summarise(n_MEASURED_VALUE = n(),
+            Mean_MEASURED_VALUE = mean(MEASURED_VALUE),
             SD_MEASURED_VALUE = sd(MEASURED_VALUE),
             Max_MEASURED_VALUE = max(MEASURED_VALUE),
             Min_MEASURED_VALUE = min(MEASURED_VALUE),
@@ -162,6 +167,7 @@ all_data %>%
             perc_95_MEASURED_VALUE = quantile(MEASURED_VALUE, probs = 0.95)) |> 
   transmute(SITE_NAME,
             STRESSOR_NAME,
+            n_MEASURED_VALUE,
             Mean_SD = case_when(is.na(SD_MEASURED_VALUE) ~ 
                                   paste0(Mean_MEASURED_VALUE |> round(2), "*"),
                               TRUE ~ 
@@ -175,7 +181,7 @@ all_data %>%
 
 # Make a table using knitr
 task_b_table <- knitr::kable(all_data_summary, digits = 2,
-             col.names = c("Site", "Stressor", "Mean ± SD", "Min.", "Max.", "5th Percentile", "95th Percentile"),
+             col.names = c("Site", "Stressor", "n", "Mean ± SD", "Min.", "Max.", "5th Percentile", "95th Percentile"),
               caption = "Table of mean, standard deviation, maximum, minimum and percentile values of measured concentrations of 48 chemical stressors across 6 freshwater sampling sites in Norway, May 6th to October 28th 2019. *: <i>n</i> too small to calculate standard deviation. All values in μg/L, rounded to 2 d.p.")
 
 
@@ -191,7 +197,7 @@ task_b_table
 
 </details>
 
-```{r concentration_fish, warning=FALSE}
+```{r concentration_fish, warning=FALSE, message=FALSE}
 # Try and import the (already downloaded and saved) chem properties, try importing if it doesn't work
 try_import_webchem <- try(webchem_chemicals <- read_csv(file = "data/webchem_chemical_data.csv"))
 if (inherits(x = try_import_webchem, what = "try-error")) {
@@ -243,7 +249,9 @@ Cf_summary_table
 
 ## Task C: Visualize the values of Cw and Cf on a map
 
-```{r task_c, warning=FALSE}
+
+
+```{r task_c, warning=FALSE, message=FALSE, fig.width = 10, fig.height=15}
 task_c_data <- Cf_all_stressors |>
   left_join(sites_sf, by = "SITE_NAME") |>
   left_join(all_stressors, by = "STRESSOR_NAME") |>
@@ -251,7 +259,8 @@ task_c_data <- Cf_all_stressors |>
   mutate(Media = case_when(
     Media == "MEASURED_VALUE" ~ "Water",
     TRUE ~ "Fish"
-  ))
+  ) |> factor(levels = c("Water", "Fish"))
+  )
 
 task_c_map <-
   ggplot(gisco_Europe_zoom) +
@@ -260,7 +269,7 @@ task_c_map <-
   geom_sf_text(aes(label = NAME_ENGL), colour = "darkgrey") +
   geom_sf(data = sites_sf, aes(size = 5, colour = SITE_NAME)) +
   geom_sf_text(data = sites_sf, aes(label = c("T", "V", "H", "S", "M"))) +
-  theme(legend.position = "none", axis.title = element_blank(), axis.ticks = element_blank(), axis.text = element_blank()) +
+  theme(legend.position = "none", axis.title = element_blank(), axis.ticks = element_blank(), axis.text = element_blank(), plot.margin = unit(c(0,0,0,0), "cm")) +
       scale_color_few()
 
 task_c_plot_list <- vector("list", 10)
@@ -288,18 +297,17 @@ for (site in sites$SITE_NAME) {
 }
 
 #try facets instead
-ggplot(data = task_c_data, mapping = aes(x = Stressor_ug, y = STRESSOR_ACRONYM)) +
+task_c_boxplots <- ggplot(data = task_c_data, mapping = aes(x = Stressor_ug, y = STRESSOR_ACRONYM, fill = SITE_NAME)) +
       geom_boxplot() +
       scale_x_log10() +
+  scale_fill_few() +
       labs(
         x = "Measured Concentration (μg/L)",
-        y = "Stressor (Abbreviated)",
-        title = paste0(site, " (", medium, ")")
-      ) +
+        y = "Stressor (Abbreviated)") +
       annotation_logticks(sides = "b") +
-      theme(axis.title = element_blank()) +
-  facet_grid(SITE_NAME ~ Media, scales = "free", space = "free_x")
-
+      theme(axis.title = element_blank(),
+            legend.position = "none") +
+  facet_grid(SITE_NAME ~ Media, scales = "free", space = "free", drop = TRUE)
 
 # y.grob <- textGrob("Stressor", 
 #                    gp=gpar(fontface="bold", fontsize=15), rot=90)
@@ -307,10 +315,6 @@ ggplot(data = task_c_data, mapping = aes(x = Stressor_ug, y = STRESSOR_ACRONYM))
 # x.grob <- textGrob("Concentration (μg/L)", 
 #                    gp=gpar(fontface="bold", fontsize=15))
 
-task_c_boxplots <- plot_grid(
-  plotlist = task_c_plot_list,
-  nrow = 5, ncol = 2, axis = "lrtb"
-)
-plot_grid(task_c_boxplots, task_c_map, ncol = 2, nrow = 1, rel_width = c(2, 1))
+plot_grid(task_c_boxplots, task_c_map, ncol = 2, nrow = 1, rel_width = c(10000, 1))
 
 ```
