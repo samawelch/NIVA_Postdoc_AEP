@@ -2,6 +2,8 @@
 Sam A. Welch
 2024-05-09
 
+N.B: For an up to date copy of the interview presentation, please go to /docs/
+
 - [Setup](#setup)
   - [Data](#data)
 - [Task A: Import and Visualise Spatiotemporal Exposure
